@@ -72,8 +72,22 @@ class S(BaseHTTPRequestHandler):
 
         return True
 
-    def _add(self, post_data):
-        logging.error("Adding to the database")
+    def _add(self, post_data, remote_addr):
+        db_table = os.getenv('DB_TABLE')
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                f"INSERT INTO {db_table} (dst, remote_addr) VALUES (%s, %s)", (post_data, remote_addr))
+
+        except psycopg2.errors.StringDataRightTruncation:
+            self._set_headers(422)
+            self.wfile.write(self._text("Unprocessable"))
+            conn.rollback()
+            return False
+
+        conn.commit()
+        cursor.close()
+        return True
 
     def do_GET(self):
         self._set_headers()
@@ -92,7 +106,8 @@ class S(BaseHTTPRequestHandler):
 
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length).decode('utf-8')
-        self._add(post_data)
+        if not self._add(post_data, remote_addr):
+            return
 
         self._set_headers()
         self.wfile.write(self._text("OK"))
@@ -142,4 +157,4 @@ if __name__ == "__main__":
     # Connect to your postgres DB
     conn = db_connect()
 
-    run(addr=args.listen, port=args.port, conn=conn)
+    run(addr=args.listen, port=args.port)

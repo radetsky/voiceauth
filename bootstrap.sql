@@ -8,6 +8,7 @@ create table voiceauth (
     id bigserial primary key,
     created timestamp with time zone default now(),
     dst varchar(16) not null default '',
+    remote_addr varchar(16) not null default '',
     updated timestamp with time zone default null,
     src varchar(16) not null default '',
     hangup_cause int not null default 0

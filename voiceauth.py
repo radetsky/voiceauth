@@ -1,7 +1,6 @@
 import logging
 import os
 import psycopg2
-import argparse
 import random
 from asterisk.ami import AMIClient, SimpleAction
 
@@ -53,8 +52,11 @@ def select_first_available():
     cursor = conn.cursor()
     db_table = os.getenv('DB_TABLE')
     cursor.execute(
-        f"SELECT dst from {db_table} where updated is null order by created limit 1 for update")
-    number = cursor.fetchone()[0]
+        f"SELECT id, dst from {db_table} where updated is null order by created limit 1 for update")
+    number = cursor.fetchone()
+    if number is None:
+        raise ValueError
+
     return number
 
 
@@ -62,35 +64,56 @@ def get_callerid():
     return random.choice(callerids)
 
 
-def call_dst(dst: str):
+def _update(id: int, dst: str, hangup_cause: int, callerid: str):
+    cursor = conn.cursor()
+    db_table = os.getenv('DB_TABLE')
+    cursor.execute(
+        f"update {db_table} set updated=now(), src=%s, hangup_cause=%s where dst=%s and id=%s", (callerid, hangup_cause, dst, id))
+    conn.commit()
+
+
+def _webhook(id: int, dst: str, hangup_cause: int, callerid: str):
+    logging.info("Running webhook")
+
+
+def call_dst(id: int, dst: str):
     logging.info(f"Calling to {dst}")
     channel = os.getenv('AMI_CHANNEL')
     context = os.getenv('AMI_CONTEXT')
     callerid = get_callerid()
     action = SimpleAction(
         'Originate',
-        Channel=channel,
+        Channel=channel+'/'+dst,
         Exten=dst,
         Priority=1,
         Context=context,
         CallerID=callerid,
+        Timeout=120000,
     )
     logging.info(action)
     future = ami.send_action(action)
     response = future.response
     logging.info(response)
-    print(response.response)
+    hangup_cause = 16
+    if response is None or response.is_error():
+        hangup_cause = 255
+
+    _update(id, dst, hangup_cause, callerid)
+    _webhook(id, dst, hangup_cause, callerid)
 
 
 def process():
     '''
-        Select first available number to call 
-        Call 
+        Select first available number to call
+        Call
         Wait for the answer
-        Webhook 
+        Webhook
     '''
-    dst = select_first_available()
-    call_dst(dst)
+    try:
+        (id, dst) = select_first_available()
+        call_dst(id, dst)
+    except ValueError:
+        logging.info("No destinations to call")
 
 
 if __name__ == "__main__":

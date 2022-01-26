@@ -8,11 +8,11 @@ export DB_TABLE=voiceauth
 export AUTH_TOKEN=test123 
 export WEBHOOK=http://localhost:8081/ 
 
-export AMI_HOST=161.35.205.64
+export AMI_HOST=143.244.144.230
 export AMI_PORT=5038 
 export AMI_USER=voiceauth
 export AMI_PASS=voiceauth
-export AMI_CHANNEL=PJSIP/provider
+export AMI_CHANNEL=SIP/provider
 export AMI_CONTEXT=voiceauth
 python3 ./voiceauth.py 
 

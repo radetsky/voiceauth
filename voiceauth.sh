@@ -12,7 +12,8 @@ export AMI_HOST=161.35.205.64
 export AMI_PORT=5038 
 export AMI_USER=voiceauth
 export AMI_PASS=voiceauth
-
+export AMI_CHANNEL=PJSIP/provider
+export AMI_CONTEXT=voiceauth
 python3 ./voiceauth.py 
 
 

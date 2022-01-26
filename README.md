@@ -26,6 +26,16 @@ read=all
 write=all
 ``` 
 
+Create text file callerids.txt in current directory with each callerid per line 
+Example: 
+```
+0440123456
+0440123987
+0440124032
+```
+
+
+
 ## Run 
 Setup environment variables in the voiceauth.sh and run it. 
 ```

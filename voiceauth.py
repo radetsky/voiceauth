@@ -1,7 +1,10 @@
 import logging
 import os
+from time import sleep
 import psycopg2
 import random
+import json
+import requests
 from asterisk.ami import AMIClient, SimpleAction
 
 
@@ -21,6 +24,17 @@ def db_connect():
     return conn
 
 
+def event_listener(event, **kwargs):
+    logging.debug(event)
+
+    if event.name == 'DialEnd' and (event.keys["DestChannelStateDesc"] == 'Down' or event.keys["DestChannelStateDesc"] == 'Up'):
+        status = event.keys["DialStatus"]
+        src = event.keys["DestCallerIDNum"]
+        dst = event.keys["DestExten"]
+        if src in callerids:
+            logging.info(f"--> {src} + {dst} = {status}")
+
+
 def ami_connect():
     logging.debug('Connecting to the asterisk manager interface')
     ami_host = os.getenv('AMI_HOST')
@@ -28,8 +42,10 @@ def ami_connect():
     ami_user = os.getenv('AMI_USER')
     ami_pass = os.getenv('AMI_PASS')
 
-    client = AMIClient(address=ami_host, port=ami_port)
+    client = AMIClient(address=ami_host, port=ami_port, timeout=3600)
     client.login(username=ami_user, secret=ami_pass)
+    client.add_event_listener(on_event=event_listener,  white_list=[
+                              'DialBegin', 'DialState', 'DialEnd'])
     return client
 
 
@@ -45,14 +61,14 @@ def print_status():
     logging.info("Database is connected")
     logging.info("Asterisk is connected")
     logging.info(f"CallerIDs: {len(callerids)}")
-    logging.info(f"Processes: 1")
+    logging.info(f"Processes: {ps}")
 
 
 def select_first_available():
     cursor = conn.cursor()
     db_table = os.getenv('DB_TABLE')
     cursor.execute(
-        f"SELECT id, dst from {db_table} where updated is null order by created limit 1 for update")
+        f"SELECT id, dst from {db_table} where updated is null order by created limit 1 for update skip locked")
     number = cursor.fetchone()
     if number is None:
         raise ValueError
@@ -64,16 +80,23 @@ def get_callerid():
     return random.choice(callerids)
 
 
-def _update(id: int, dst: str, hangup_cause: int, callerid: str):
+def _update(id: int, dst: str, status: str, callerid: str):
     cursor = conn.cursor()
     db_table = os.getenv('DB_TABLE')
     cursor.execute(
-        f"update {db_table} set updated=now(), src=%s, hangup_cause=%s where dst=%s and id=%s", (callerid, hangup_cause, dst, id))
+        f"update {db_table} set updated=now(), src=%s, dial_status=%s where dst=%s and id=%s", (callerid, status, dst, id))
     conn.commit()
 
 
-def _webhook(id: int, dst: str, hangup_cause: int, callerid: str):
-    logging.info("Running webhook")
+def _webhook(id: int, dst: str, dial_status: str, callerid: str):
+    uri = os.getenv('WEBHOOK')
+    payload = {'dst': dst, 'callerid': callerid, 'status': dial_status}
+    logging.info(f"POST {uri} {payload}")
+    try:
+        r = requests.post(uri, data=json.dumps(payload))
+        logging.info(r)
+    except requests.exceptions.RequestException as e:
+        logging.error(e)
 
 
 def call_dst(id: int, dst: str):
@@ -83,23 +106,24 @@ def call_dst(id: int, dst: str):
     callerid = get_callerid()
     action = SimpleAction(
         'Originate',
-        Channel=channel+'/'+dst,
+        ActionID=dst,
+        Variable=f"ORIGCID=\"{callerid}\"",
+        Channel=f"Local/{dst}@{channel}",
         Exten=dst,
         Priority=1,
         Context=context,
         CallerID=callerid,
-        Timeout=120000,
+        Timeout=60000,
     )
-    logging.info(action)
-    future = ami.send_action(action)
-    response = future.response
-    logging.info(response)
-    hangup_cause = 16
-    if response is None or response.is_error():
-        hangup_cause = 255
-
-    _update(id, dst, hangup_cause, callerid)
-    _webhook(id, dst, hangup_cause, callerid)
+    logging.debug(action)
+    resp = ami.send_action(action)
+    logging.info(resp.response)
+    if resp.response.status == 'Success':
+        _update(id, dst, 'ANSWER', callerid)
+        _webhook(id, dst, 'ANSWER', callerid)
+    if resp.response.status == 'Error':
+        _update(id, dst, 'BUSY', callerid)
+        _webhook(id, dst, 'BUSY', callerid)
 
 
 def process():
@@ -109,17 +133,46 @@ def process():
         Wait for the answer
         Webhook
     '''
+
     try:
         (id, dst) = select_first_available()
         call_dst(id, dst)
+
     except ValueError:
         logging.info("No destinations to call")
 
+    finally:
+        sleep(1)
+
+
+def setup_processes(count: int):
+    logging.info(f"Setup dedicated processes: {count}")
+    i = 0
+    while i < count:
+        pid = os.fork()
+        if pid > 0:
+            i = i + 1
+            continue
+        else:
+            break
+
 
 if __name__ == "__main__":
+
+    ps = int(os.getenv("VA_PROCESS_COUNT"))
+    if ps is not None and ps > 1:
+        setup_processes(ps-1)  # We also use parent process
+
     # Connect to your postgres DB
     conn = db_connect()
     ami = ami_connect()
     callerids = read_callerids()
+
     print_status()
-    process()
+    while True:
+        try:
+            process()
+
+        except (KeyboardInterrupt, SystemExit):
+            ami.logoff()
+            exit(0)

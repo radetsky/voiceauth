@@ -8,10 +8,8 @@ To validate user with the telephone by check CallerID of incoming call
 
 ```
 sudo apt-get update
-sudo apt-get install asterisk 
-sudo apt-get install build-essential
-sudo apt-get install postgresql  
-git clone ...
+sudo apt-get install asterisk build-essential postgresql python3-pip
+git clone https://github.com/radetsky/voiceauth.git
 cd voiceauth 
 python3 -m pip install -r ./requirements.txt 
 ```
@@ -74,8 +72,27 @@ Restart asterisk:
 systemctl restart asterisk
 ```
 
+### Zadarma properties 
+Zadarma wants to setup IP based authorization before you can set your own CallerID. 
+Please follow the instructions https://zadarma.com/en/support/instructions/asterisk/trunk/
+And do not forget to call 8888 to confirm IP address settings. Use any softphone to connect. 
 
+## Firewall setup 
+I prefer to use whitelist firewall settings because of any asterisk installation turns into a target. This is example of firewall setup for Zadarma service. 
+Add here your IP address to allow API calls.
 
+```
+sudo ufw default deny incoming
+sudo ufw allow ssh 
+sudo ufw allow from 185.45.152.0/24
+sudo ufw allow from 185.45.155.0/24
+sudo ufw allow from 37.139.38.0/24
+sudo ufw allow from 195.122.19.0/27
+sudo ufw allow from 103.109.103.64/28
+sudo ufw allow from 31.31.222.192/27
+sudo ufw allow from 89.185.0.75 
+sudo ufw enable 
+```
 
 ## Run 
 Setup environment variables in the voiceauth.sh and run it. 
@@ -89,4 +106,9 @@ AUTH_TOKEN is a string that http_api expect in X-Auth-Token HTTP header in POST 
 WEBHOOK is URL to POST JSON data with the result of every call that made by voiceauth.py
 AMI_* parameters is an asterisk manager access parameters that configured in /etc/asterisk/manager.conf 
 
+# Webhook 
+After any call to user voiceauth will do POST request to WEBHOOK with the body in JSON format
+```
+{"dst": "0501231231", "callerid": "+380919876543", "status": "BUSY"}
+```
 

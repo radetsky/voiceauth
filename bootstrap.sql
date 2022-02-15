@@ -11,7 +11,7 @@ create table voiceauth (
     remote_addr varchar(16) not null default '',
     updated timestamp with time zone default null,
     src varchar(16) not null default '',
-    hangup_cause int not null default 0
+    dial_status varchar(16) not null default ''
 );
 
 create index on voiceauth (created);

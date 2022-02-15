@@ -101,12 +101,19 @@ vim ./voiceauth.sh
 ./voiceauth.sh
 ```
 
+
+
 DB_* variables is simple and do not need to make a description 
 AUTH_TOKEN is a string that http_api expect in X-Auth-Token HTTP header in POST request 
 WEBHOOK is URL to POST JSON data with the result of every call that made by voiceauth.py
 AMI_* parameters is an asterisk manager access parameters that configured in /etc/asterisk/manager.conf 
 
-# Webhook 
+## Initiate call 
+```
+curl -d "0501231231" http://localhost:8000 -H "X-Auth-Token: test123"
+```
+
+## Webhook 
 After any call to user voiceauth will do POST request to WEBHOOK with the body in JSON format
 ```
 {"dst": "0501231231", "callerid": "+380919876543", "status": "BUSY"}

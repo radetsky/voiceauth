@@ -15,7 +15,6 @@ export AMI_PASS=voiceauth
 export AMI_CHANNEL=va_call # outgoing context to call the user
 export AMI_CONTEXT=va_answer  # answering context to call the user 
 export VA_PROCESS_COUNT=3
+python3 ./http_api.py &
 python3 ./voiceauth.py 
-
-
 

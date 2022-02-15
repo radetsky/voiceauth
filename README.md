@@ -8,11 +8,19 @@ To validate user with the telephone by check CallerID of incoming call
 
 ```
 sudo apt-get update
-sudo apt-get install asterisk build-essential postgresql python3-pip
+sudo apt-get install asterisk build-essential postgresql python3-pip postgresql-client-common
 git clone https://github.com/radetsky/voiceauth.git
 cd voiceauth 
 python3 -m pip install -r ./requirements.txt 
 ```
+
+### Setup PostgreSQL 
+```
+sudo -i -u postgres psql
+```
+Copy-paste content of bootstrap.sql file 
+
+### Asterisk setup 
 
 Add these configuration files as /etc/asterisk/manager.d/voiceauth.conf:
 ```

@@ -24,6 +24,10 @@ def db_connect():
     return conn
 
 
+def on_disconnect():
+    ami = ami_connect()
+
+
 def event_listener(event, **kwargs):
     logging.debug(event)
 
@@ -44,8 +48,10 @@ def ami_connect():
 
     client = AMIClient(address=ami_host, port=ami_port, timeout=3600)
     client.login(username=ami_user, secret=ami_pass)
-    client.add_event_listener(on_event=event_listener,  white_list=[
-                              'DialBegin', 'DialState', 'DialEnd'])
+    client.add_event_listener(on_event=event_listener,
+                              on_disconnect=on_disconnect,
+                              white_list=[
+                                  'DialBegin', 'DialState', 'DialEnd'])
     return client
 
 

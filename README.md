@@ -58,7 +58,7 @@ Find the 'authentication' section and add something like these bottom lines to t
 type=peer
 host=IP.AD.DR.ES
 fromuser=LOGIN
-context=public
+context=voiceauth
 call-limit=HOWMUCHLINESYOUVEGOT
 disallow=all
 allow=ulaw
@@ -71,6 +71,22 @@ Add these lines to /etc/asterisk/extensions.ael:
 context voiceauth {
     _X! => {
         Hangup(16);
+    }
+}
+context va_call {
+    _X! => {
+        Set(CALLERID(all)="${ORIGCID}");
+        Dial(SIP/provider/${EXTEN},120);
+        NoOp(${DIALSTATUS});
+        Hangup(16);
+    }
+}
+
+context va_answer {
+    _X! => {
+       Answer();
+       Wait(1);
+       Hangup(16);
     }
 }
 ```

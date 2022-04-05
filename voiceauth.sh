@@ -8,7 +8,7 @@ export DB_TABLE=voiceauth
 export AUTH_TOKEN=test123 
 export WEBHOOK=http://localhost:8001/ 
 
-export AMI_HOST=178.62.222.78
+export AMI_HOST=127.0.0.1
 export AMI_PORT=5038 
 export AMI_USER=voiceauth
 export AMI_PASS=voiceauth

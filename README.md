@@ -75,7 +75,7 @@ context voiceauth {
 }
 context va_call {
     _X! => {
-        Set(CALLERID(all)="${ORIGCID}");
+        Set(CALLERID(all)=${ORIGCID});
         Dial(SIP/provider/${EXTEN},120);
         NoOp(${DIALSTATUS});
         Hangup(16);

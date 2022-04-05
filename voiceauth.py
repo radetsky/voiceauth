@@ -6,6 +6,7 @@ import random
 import json
 import requests
 from asterisk.ami import AMIClient, SimpleAction
+from datetime import datetime, timezone
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
@@ -87,10 +88,11 @@ def get_callerid():
 
 
 def _update(id: int, dst: str, status: str, callerid: str):
+    dt = datetime.now(timezone.utc)
     cursor = conn.cursor()
     db_table = os.getenv('DB_TABLE')
     cursor.execute(
-        f"update {db_table} set updated=now(), src=%s, dial_status=%s where dst=%s and id=%s", (callerid, status, dst, id))
+        f"update {db_table} set updated=%s, src=%s, dial_status=%s where dst=%s and id=%s", (dt, callerid, status, dst, id))
     conn.commit()
 
 
